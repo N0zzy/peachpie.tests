@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "peachpie.items", "peachpie.items\peachpie.items\peachpie.items.csproj", "{859A8D53-F58A-46C0-A2BD-060895B23C3F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "peachpie.xunit", "peachpie.xunit\peachpie.xunit\peachpie.xunit.csproj", "{035B31AA-8143-4C42-B511-EAD59BB6A30A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{859A8D53-F58A-46C0-A2BD-060895B23C3F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{859A8D53-F58A-46C0-A2BD-060895B23C3F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{859A8D53-F58A-46C0-A2BD-060895B23C3F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{859A8D53-F58A-46C0-A2BD-060895B23C3F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{035B31AA-8143-4C42-B511-EAD59BB6A30A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{035B31AA-8143-4C42-B511-EAD59BB6A30A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{035B31AA-8143-4C42-B511-EAD59BB6A30A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{035B31AA-8143-4C42-B511-EAD59BB6A30A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
