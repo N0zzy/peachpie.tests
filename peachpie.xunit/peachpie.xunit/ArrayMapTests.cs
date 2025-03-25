@@ -52,6 +52,7 @@ namespace peachpie.xunit
             var optimizedResult = ArrayMapExample.array_map_Optimized(ctx, Callback, arrays);
             var optimizedStruct = ArrayMapExample.array_map_Optimized_With_Struct(ctx, Callback, arrays);
             var optimizedFinal = ArrayMapExample.array_map_Optimized_Final(ctx, Callback, arrays);
+            var optimizedOther = ArrayMapExample.array_map_Optimized_Other(ctx, Callback, arrays);
 
             // Assert
             testOutputHelper.WriteLine($"Expected: {PrintPhpArray( expectedResult )}");
@@ -59,11 +60,13 @@ namespace peachpie.xunit
             testOutputHelper.WriteLine($"Optimized: {PrintPhpArray( optimizedResult )}");
             testOutputHelper.WriteLine($"Optimized Struct: {PrintPhpArray( optimizedStruct )}");
             testOutputHelper.WriteLine($"Optimized Final: {PrintPhpArray( optimizedFinal )}");
+            testOutputHelper.WriteLine($"Optimized Other: {PrintPhpArray( optimizedOther )}");
 
             // Assert
             Assert.True(ArePhpArraysEqual(originalResult, optimizedResult));
             Assert.True(ArePhpArraysEqual(originalResult, optimizedStruct));
             Assert.True(ArePhpArraysEqual(originalResult, optimizedFinal));
+            Assert.True(ArePhpArraysEqual(originalResult, optimizedOther));
         }
 
         /// <summary>
