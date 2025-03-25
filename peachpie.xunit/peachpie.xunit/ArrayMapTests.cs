@@ -42,7 +42,22 @@ namespace peachpie.xunit
             var ctx = Context.CreateEmpty();
             var arrays = new PhpArray[]
             {
-                new PhpArray(new PhpValue[] { PhpValue.Create(1), PhpValue.Create(2) }),
+                new PhpArray(new PhpValue[]
+                {
+                    PhpValue.Create(1), 
+                    PhpValue.Create(2), 
+                    PhpValue.Create("3"), 
+                    PhpValue.Create("4"),
+                    PhpValue.Null,
+                    PhpValue.Create(new PhpArray()
+                    {
+                        PhpValue.Create(1), 
+                        PhpValue.Create(2), 
+                        PhpValue.Create("3"), 
+                        PhpValue.Create("4"),
+                        PhpValue.Null,       
+                    }), 
+                }),
                 new PhpArray(new PhpValue[] { PhpValue.Create(3) })
             };
             var expectedResult = new PhpArray(new PhpValue[] { PhpValue.Create(4), PhpValue.Null });
