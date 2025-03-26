@@ -47,7 +47,13 @@ namespace peachpie.xunit
                 { "a", 10 }, 
                 { "b", 20 }, 
                 { 0, "value1" }, 
-                { 1, "value2" } 
+                { 1, "value2" } ,
+                { 10, new PhpArray { 
+                    { "a1", 10 }, 
+                    { "b2", 20 }, 
+                    { 4, "value1" }, 
+                    { 6, "value2" } 
+                }}
             };
 
             // Act
