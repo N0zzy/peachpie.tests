@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Buffers;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Pchp.Core;
 
@@ -9,7 +10,7 @@ public class ArrayMap : ArrayMapExample
     public ArrayMap(int size, int count)
     {
         Console.WriteLine("\n===== Array Map Tests =====");
-        
+
         var ctx = Context.CreateEmpty();
         int arraySize = size;
         int arrayCount = count;
@@ -25,42 +26,23 @@ public class ArrayMap : ArrayMapExample
 
             return PhpValue.Create(sum);
         });
-        
+
         Console.WriteLine("Testing Original Version...");
         var (timeOriginal, memoryOriginal, resultOriginal) =
             TestFunction(() => array_map_Original(ctx, callback, arrays));
-        
+
         Console.WriteLine("Testing Optimized Version...");
         var (timeOptimized, memoryOptimized, resultOptimized) =
             TestFunction(() => array_map_Optimized(ctx, callback, arrays));
-        
-        Console.WriteLine("Testing Optimized With Struct Version...");
-        var (timeOptimizedStruct, memoryOptimizedStruct, resultOptimizedStruct) =
-            TestFunction(() => array_map_Optimized_With_Struct(ctx, callback, arrays));
-        
-        Console.WriteLine("Testing Optimized Final Version...");
-        var (timeOptimizedFinal, memoryOptimizedFinal, resultOptimizedFinal) =
-            TestFunction(() => array_map_Optimized_Final(ctx, callback, arrays));
 
-        Console.WriteLine("Testing Optimized Other Version...");
-        var (timeOptimizedOther, memoryOptimizedOther, resultOptimizedOther) =
-            TestFunction(() => array_map_Optimized_Other(ctx, callback, arrays));
-
-
-        // Сравнение результатов
         bool resultsAreEqual = false;
         if (
             resultOriginal != null &&
-            resultOptimized != null &&
-            resultOptimizedStruct != null &&
-            resultOptimizedFinal != null &&
-            resultOptimizedOther != null
+            resultOptimized != null
         )
         {
-            resultsAreEqual = ComparePhpArrays(resultOriginal, resultOptimized) &&
-                              ComparePhpArrays(resultOriginal, resultOptimizedStruct) &&
-                              ComparePhpArrays(resultOriginal, resultOptimizedFinal) &&
-                              ComparePhpArrays(resultOriginal, resultOptimizedOther);
+            resultsAreEqual = ComparePhpArrays(resultOriginal, resultOptimized)
+                ;
         }
         else
         {
@@ -76,18 +58,6 @@ public class ArrayMap : ArrayMapExample
         Console.WriteLine("\n >>> Optimized Version:");
         Console.WriteLine($"Time: {timeOptimized} ms");
         Console.WriteLine($"Memory: {memoryOptimized} B");
-
-        Console.WriteLine("\n >>> Optimized With Struct Version:");
-        Console.WriteLine($"Time: {timeOptimizedStruct} ms");
-        Console.WriteLine($"Memory: {memoryOptimizedStruct} B");
-
-        Console.WriteLine("\n >>> Optimized Final Version:");
-        Console.WriteLine($"Time: {timeOptimizedFinal} ms");
-        Console.WriteLine($"Memory: {memoryOptimizedFinal} B");
-
-        Console.WriteLine("\n >>> Optimized Other Version:");
-        Console.WriteLine($"Time: {timeOptimizedOther} ms");
-        Console.WriteLine($"Memory: {memoryOptimizedOther} B");
 
         Console.WriteLine("\nResults are equal: " + resultsAreEqual);
     }
@@ -117,7 +87,7 @@ public class ArrayMap : ArrayMapExample
     /// </summary>
     static (long time, long memory, PhpArray? result) TestFunction(Func<PhpArray> action)
     {
-        GC.Collect(); 
+        GC.Collect();
         GC.WaitForPendingFinalizers();
         Thread.Sleep(200);
 
@@ -198,7 +168,8 @@ public class ArrayMapExample
     /// <summary>
     /// Исходная версия array_map.
     /// </summary>
-    public static PhpArray array_map_Original(Context ctx /*, caller*/, IPhpCallable map, [In, Out] params PhpArray[] arrays)
+    public static PhpArray array_map_Original(Context ctx /*, caller*/, IPhpCallable map,
+        [In, Out] params PhpArray[] arrays)
     {
         if (map != null && !PhpVariable.IsValidBoundCallback(ctx, map))
         {
@@ -317,7 +288,7 @@ public class ArrayMapExample
             PhpException.InvalidArgument(nameof(map));
             return null;
         }
-
+        
         if (arrays == null || arrays.Length == 0)
         {
             PhpException.InvalidArgument(nameof(arrays), "arg_null_or_empty");
@@ -325,164 +296,100 @@ public class ArrayMapExample
         }
 
         map ??= _mapIdentity;
+        
+        int max_count = 0;
+        var iterators = new OrderedDictionary.FastEnumerator[arrays.Length];
 
-        int count = arrays.Length;
-        bool preserveKeys = count == 1;
-        var args = new PhpValue[count];
-        int maxCount = 0;
-
-        foreach (var array in arrays)
+        for (int i = 0; i < arrays.Length; i++)
         {
-            if (array.Count > maxCount) maxCount = array.Count;
-        }
-
-        var result = new PhpArray(preserveKeys ? arrays[0].Count : maxCount);
-
-        for (int i = 0; i < maxCount; i++)
-        {
-            for (int j = 0; j < arrays.Length; j++)
+            if (arrays[i] == null)
             {
-                args[j] = i < arrays[j].Count ? arrays[j][i] : PhpValue.Null;
+                PhpException.Throw(PhpError.Warning, "argument_not_array", (i + 2).ToString());
+                return null;
             }
 
-            var returnValue = map?.Invoke(ctx, args);
-
-            if (preserveKeys)
-            {
-                result.Add(i, returnValue);
-            }
-            else
-            {
-                result.Add(returnValue);
-            }
+            iterators[i] = arrays[i].GetFastEnumerator();
+            max_count = Math.Max(max_count, arrays[i].Count);
         }
+        
+        var result = new PhpArray(max_count);
+        bool preserve_keys = arrays.Length == 1;
+        const int SmallArrayThreshold = 8; 
 
-        return result;
-    }
-
-    private static PhpValue[] _argsBuffer;
-
-    /// <summary>
-    ///  Оптимизированная версия array_map.
-    /// </summary>
-    /// <param name="ctx"></param>
-    /// <param name="map"></param>
-    /// <param name="arrays"></param>
-    /// <returns></returns>
-    public static PhpArray array_map_Optimized_With_Struct(Context ctx, IPhpCallable map,
-        [In, Out] params PhpArray[] arrays)
-    {
-        if (_argsBuffer == null || _argsBuffer.Length < arrays.Length)
+        if (arrays.Length <= SmallArrayThreshold)
         {
-            _argsBuffer = new PhpValue[arrays.Length];
-        }
+            var args = new PhpValue[arrays.Length];
 
-        int maxCount = arrays.Max(a => a.Count);
-        var result = new PhpArray(maxCount);
-
-        for (int i = 0; i < maxCount; i++)
-        {
-            for (int j = 0; j < arrays.Length; j++)
+            for (int n = 0; n < max_count; n++)
             {
-                _argsBuffer[j] = i < arrays[j].Count ? arrays[j][i] : PhpValue.Null;
-            }
-            result.Add(map.Invoke(ctx, _argsBuffer));
-        }
+                bool hasValues = false;
+                
+                for (int i = 0; i < arrays.Length; i++)
+                {
+                    if (iterators[i].MoveNext())
+                    {
+                        args[i] = iterators[i].CurrentValue;
+                        hasValues = true;
+                    }
+                    else
+                    {
+                        args[i] = PhpValue.Null;
+                    }
+                }
 
-        return result;
-    }
-    
-    /// <summary>
-    ///     Оптимизированная версия array_map.
-    /// </summary>
-    /// <param name="ctx"></param>
-    /// <param name="map"></param>
-    /// <param name="arrays"></param>
-    /// <returns></returns>
-    public static PhpArray array_map_Optimized_Final(Context ctx, IPhpCallable map, [In, Out] params PhpArray[] arrays)
-    {
-        if (map != null && !PhpVariable.IsValidBoundCallback(ctx, map))
-        {
-            PhpException.InvalidArgument(nameof(map));
-            return null;
-        }
-
-        if (arrays == null || arrays.Length == 0)
-        {
-            PhpException.InvalidArgument(nameof(arrays), "arg_null_or_empty");
-            return null;
-        }
-
-        map ??= _mapIdentity;
-
-        int count = arrays.Length;
-        bool preserveKeys = count == 1;
-        var args = new PhpValue[count];
-        int maxCount = arrays.Max(a => a.Count);
-
-        var result = new PhpArray(maxCount);
-
-        for (int i = 0; i < maxCount; i++)
-        {
-            for (int j = 0; j < arrays.Length; j++)
-            {
-                args[j] = i < arrays[j].Count ? arrays[j][i] : PhpValue.Null;
-            }
-
-            var returnValue = map?.Invoke(ctx, args);
-
-            if (preserveKeys)
-            {
-                result.Add(i, returnValue);
-            }
-            else
-            {
-                result.Add(returnValue);
+                if (!hasValues) break;
+                
+                if (preserve_keys)
+                {
+                    result.Add(iterators[0].CurrentKey, map.Invoke(ctx, args));
+                }
+                else
+                {
+                    result.Add(map.Invoke(ctx, args));
+                }
             }
         }
-
-        return result;
-    }
-
-    /// <summary>
-    ///   Оптимизированная версия array_map.
-    /// </summary>
-    /// <param name="ctx"></param>
-    /// <param name="map"></param>
-    /// <param name="arrays"></param>
-    /// <returns></returns>
-    public static PhpArray array_map_Optimized_Other(Context ctx, IPhpCallable map, [In, Out] params PhpArray[] arrays)
-    {
-        if (map == null || arrays == null || arrays.Length == 0)
+        else
         {
-            return null;
-        }
+            // 6.2 Оптимизация для больших массивов (используем ArrayPool)
+            var args = ArrayPool<PhpValue>.Shared.Rent(arrays.Length);
 
-        map ??= _mapIdentity;
-
-        int count = arrays.Length;
-        bool preserveKeys = count == 1;
-        int maxCount = arrays.Max(a => a.Count);
-
-        var result = new PhpArray(maxCount);
-        var argsBuffer = new PhpValue[count];
-
-        for (int i = 0; i < maxCount; i++)
-        {
-            for (int j = 0; j < count; j++)
+            try
             {
-                argsBuffer[j] = i < arrays[j].Count ? arrays[j][i] : PhpValue.Null;
+                for (int n = 0; n < max_count; n++)
+                {
+                    bool hasValues = false;
+
+                    // Заполняем аргументы
+                    for (int i = 0; i < arrays.Length; i++)
+                    {
+                        if (iterators[i].MoveNext())
+                        {
+                            args[i] = iterators[i].CurrentValue;
+                            hasValues = true;
+                        }
+                        else
+                        {
+                            args[i] = PhpValue.Null;
+                        }
+                    }
+
+                    if (!hasValues) break;
+
+                    // Добавляем результат
+                    if (preserve_keys)
+                    {
+                        result.Add(iterators[0].CurrentKey, map.Invoke(ctx, args));
+                    }
+                    else
+                    {
+                        result.Add(map.Invoke(ctx, args));
+                    }
+                }
             }
-
-            var returnValue = map?.Invoke(ctx, argsBuffer);
-
-            if (preserveKeys)
+            finally
             {
-                result.Add(i, returnValue);
-            }
-            else
-            {
-                result.Add(returnValue);
+                ArrayPool<PhpValue>.Shared.Return(args);
             }
         }
 

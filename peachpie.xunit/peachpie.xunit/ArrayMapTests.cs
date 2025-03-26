@@ -40,49 +40,27 @@ namespace peachpie.xunit
         {
             // Arrange
             var ctx = Context.CreateEmpty();
-            var arrays = new PhpArray[]
-            {
-                new PhpArray(new PhpValue[]
-                {
-                    PhpValue.Null, 
-                    PhpValue.False,
-                    PhpValue.True,
-                    PhpValue.Create(1),  
-                    PhpValue.Create(2),
-                    PhpValue.Create("text"),
-                    new PhpArray(new PhpValue[]
-                    {
-                        PhpValue.Null, 
-                        PhpValue.False,
-                        PhpValue.True,
-                        PhpValue.Create(1),  
-                        PhpValue.Create(2),
-                        PhpValue.Create("text"),
-                    })
-                })
+            
+            // Test Values
+            var arrays = new PhpArray 
+            { 
+                { "a", 10 }, 
+                { "b", 20 }, 
+                { 0, "value1" }, 
+                { 1, "value2" } 
             };
-            var expectedResult = new PhpArray(new PhpValue[] { PhpValue.Create(4), PhpValue.Null });
 
             // Act
             var originalResult = ArrayMapExample.array_map_Original(ctx, Callback, arrays);
             var optimizedResult = ArrayMapExample.array_map_Optimized(ctx, Callback, arrays);
-            var optimizedStruct = ArrayMapExample.array_map_Optimized_With_Struct(ctx, Callback, arrays);
-            var optimizedFinal = ArrayMapExample.array_map_Optimized_Final(ctx, Callback, arrays);
-            var optimizedOther = ArrayMapExample.array_map_Optimized_Other(ctx, Callback, arrays);
 
             // Assert
-            testOutputHelper.WriteLine($"Expected: {PrintPhpArray( expectedResult )}");
+            testOutputHelper.WriteLine($"Expected: {PrintPhpArray( arrays )}");
             testOutputHelper.WriteLine($"Original: {PrintPhpArray( originalResult )}");
             testOutputHelper.WriteLine($"Optimized: {PrintPhpArray( optimizedResult )}");
-            testOutputHelper.WriteLine($"Optimized Struct: {PrintPhpArray( optimizedStruct )}");
-            testOutputHelper.WriteLine($"Optimized Final: {PrintPhpArray( optimizedFinal )}");
-            testOutputHelper.WriteLine($"Optimized Other: {PrintPhpArray( optimizedOther )}");
 
             // Assert
             Assert.True(ArePhpArraysEqual(originalResult, optimizedResult));
-            Assert.True(ArePhpArraysEqual(originalResult, optimizedStruct));
-            Assert.True(ArePhpArraysEqual(originalResult, optimizedFinal));
-            Assert.True(ArePhpArraysEqual(originalResult, optimizedOther));
         }
 
         /// <summary>
