@@ -44,21 +44,22 @@ namespace peachpie.xunit
             {
                 new PhpArray(new PhpValue[]
                 {
-                    PhpValue.Create(1), 
-                    PhpValue.Create(2), 
-                    PhpValue.Create("3"), 
-                    PhpValue.Create("4"),
-                    PhpValue.Null,
-                    PhpValue.Create(new PhpArray()
+                    PhpValue.Null, 
+                    PhpValue.False,
+                    PhpValue.True,
+                    PhpValue.Create(1),  
+                    PhpValue.Create(2),
+                    PhpValue.Create("text"),
+                    new PhpArray(new PhpValue[]
                     {
-                        PhpValue.Create(1), 
-                        PhpValue.Create(2), 
-                        PhpValue.Create("3"), 
-                        PhpValue.Create("4"),
-                        PhpValue.Null,       
-                    }), 
-                }),
-                new PhpArray(new PhpValue[] { PhpValue.Create(3) })
+                        PhpValue.Null, 
+                        PhpValue.False,
+                        PhpValue.True,
+                        PhpValue.Create(1),  
+                        PhpValue.Create(2),
+                        PhpValue.Create("text"),
+                    })
+                })
             };
             var expectedResult = new PhpArray(new PhpValue[] { PhpValue.Create(4), PhpValue.Null });
 
