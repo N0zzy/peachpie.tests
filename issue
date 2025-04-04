@@ -1,0 +1,8 @@
+Hi, I'm still trying to find ways to improve the performance of the array_map function. I already wrote in Discord and got some feedback on my previous solution. However, I found:
+1. https://www.php.net/manual/en/function.array-map.php example 5 and peachpie have different results and I did not find a similar problem in his solution
+2. a way to increase performance up to 50% in some variants, but memory consumption is a little higher than your solution
+
+link to the original example
+https://github.com/N0zzy/peachpie.tests/blob/master/peachpie.items/peachpie.items/Arrays/ArrayMap.cs
+
+I hope you can check this function or based on the provided thesis - make an improvement to the function

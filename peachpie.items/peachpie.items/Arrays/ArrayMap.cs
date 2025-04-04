@@ -144,10 +144,10 @@ public class ArrayMap : ArrayMapExample
 
         return true;
     }
+}
 
-    /// <summary>
-    /// Default callback for <see cref="Map"/>.
-    /// </summary>
+public class ArrayMapExample
+{
     private static readonly IPhpCallable _mapIdentity = PhpCallback.Create((ctx, args) =>
     {
         var result = new PhpArray(args.Length);
@@ -159,16 +159,12 @@ public class ArrayMap : ArrayMapExample
 
         return PhpValue.Create(result);
     });
-}
-
-public class ArrayMapExample
-{
-    public static IPhpCallable? _mapIdentity;
 
     /// <summary>
     /// Исходная версия array_map.
     /// </summary>
-    public static PhpArray array_map_Original(Context ctx /*, caller*/, IPhpCallable map, [In, Out] params PhpArray[] arrays)
+    public static PhpArray array_map_Original(Context ctx /*, caller*/, IPhpCallable map,
+        [In, Out] params PhpArray[] arrays)
     {
         if (map != null && !PhpVariable.IsValidBoundCallback(ctx, map))
         {
@@ -281,28 +277,32 @@ public class ArrayMapExample
     /// </summary>
     public static PhpArray array_map_Optimized(Context ctx, IPhpCallable map, params PhpArray[] arrays)
     {
+        // Проверка входных данных
         if (arrays == null || arrays.Length == 0)
         {
             PhpException.InvalidArgument(nameof(arrays), "arg_null_or_empty");
             return null;
         }
 
+        // Если map не задан или является функцией-идентичностью, и есть только один массив
+        if ((map == null || map == _mapIdentity) && arrays.Length == 1)
+        {
+            return arrays[0].DeepCopy();
+        }
+
+        // Проверка корректности callback-функции
         if (map != null && !PhpVariable.IsValidBoundCallback(ctx, map))
         {
             PhpException.InvalidArgument(nameof(map));
             return null;
         }
 
-        if (arrays.Length == 1 && map == _mapIdentity)
-        {
-            return arrays[0].DeepCopy();
-        }
+        map ??= _mapIdentity;
 
-        map ??= _mapIdentity ??= CreateIdentityCallback();
-
+        // Создание итераторов для всех массивов
         var iterators = new OrderedDictionary.FastEnumerator[arrays.Length];
-        int max_count = 0;
-        for (int i = 0; i < arrays.Length; i++)
+        var max_count = 0;
+        for (var i = 0; i < arrays.Length; i++)
         {
             if (arrays[i] == null)
             {
@@ -311,71 +311,43 @@ public class ArrayMapExample
             }
 
             iterators[i] = arrays[i].GetFastEnumerator();
-            max_count = Math.Max(max_count, arrays[i].Count);
+            max_count = max_count > arrays[i].Count ? max_count : arrays[i].Count;
         }
 
-        // 4. Выбор стратегии обработки
-        PhpArray result = new PhpArray(max_count);
-        bool preserve_keys = (arrays.Length == 1);
+        bool preserve_keys = arrays.Length == 1;
 
-        // Маленькие массивы: создаём новый массив вместо пула
-        PhpValue[] args = arrays.Length <= 4
+        var args = arrays.Length <= 4
             ? new PhpValue[arrays.Length]
             : ArrayPool<PhpValue>.Shared.Rent(arrays.Length);
 
-        try
+        PhpArray result = new PhpArray(max_count);
+
+        while (true)
         {
-            while (true)
+            bool has_values = false;
+            for (int i = 0; i < arrays.Length; i++)
             {
-                bool has_values = false;
-                for (int i = 0; i < arrays.Length; i++)
+                if (iterators[i].MoveNext())
                 {
-                    if (iterators[i].MoveNext())
-                    {
-                        args[i] = iterators[i].CurrentValue;
-                        has_values = true;
-                    }
-                    else
-                    {
-                        args[i] = PhpValue.Null;
-                    }
+                    args[i] = iterators[i].CurrentValue;
+                    has_values = true;
                 }
-
-                if (!has_values) break;
-
-                var return_value = map.Invoke(ctx, args);
-                if (preserve_keys)
-                    result.Add(iterators[0].CurrentKey, return_value);
                 else
-                    result.Add(return_value);
+                {
+                    args[i] = PhpValue.Null;
+                }
             }
-        }
-        finally
-        {
-            if (arrays.Length > 4)
-                ArrayPool<PhpValue>.Shared.Return(args);
-        }
 
+            if (!has_values) break;
+            result.Add(preserve_keys
+                ? iterators[0].CurrentKey
+                : PhpValue.Null, map.Invoke(ctx, args)
+            );
+        }
+        
+        if (arrays.Length > 4)
+            ArrayPool<PhpValue>.Shared.Return(args);
+        
         return result;
-    }
-
-
-    private static IPhpCallable CreateIdentityCallback()
-    {
-        return PhpCallback.Create((ctx, args) =>
-        {
-            if (args.Length == 1)
-            {
-                return args[0].DeepCopy();
-            }
-
-            var result = new PhpArray(args.Length);
-            foreach (var arg in args)
-            {
-                result.Add(arg.DeepCopy());
-            }
-
-            return result;
-        });
     }
 }
