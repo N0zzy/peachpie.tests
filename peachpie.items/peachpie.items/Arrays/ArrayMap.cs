@@ -168,8 +168,7 @@ public class ArrayMapExample
     /// <summary>
     /// Исходная версия array_map.
     /// </summary>
-    public static PhpArray array_map_Original(Context ctx /*, caller*/, IPhpCallable map,
-        [In, Out] params PhpArray[] arrays)
+    public static PhpArray array_map_Original(Context ctx /*, caller*/, IPhpCallable map, [In, Out] params PhpArray[] arrays)
     {
         if (map != null && !PhpVariable.IsValidBoundCallback(ctx, map))
         {
@@ -277,29 +276,32 @@ public class ArrayMapExample
         return result;
     }
 
-
     /// <summary>
     /// Оптимизированная версия array_map.
     /// </summary>
-    public static PhpArray array_map_Optimized(Context ctx, IPhpCallable map, [In, Out] params PhpArray[] arrays)
+    public static PhpArray array_map_Optimized(Context ctx, IPhpCallable map, params PhpArray[] arrays)
     {
-        if (map != null && !PhpVariable.IsValidBoundCallback(ctx, map))
-        {
-            PhpException.InvalidArgument(nameof(map));
-            return null;
-        }
-        
         if (arrays == null || arrays.Length == 0)
         {
             PhpException.InvalidArgument(nameof(arrays), "arg_null_or_empty");
             return null;
         }
 
-        map ??= _mapIdentity;
-        
-        int max_count = 0;
-        var iterators = new OrderedDictionary.FastEnumerator[arrays.Length];
+        if (map != null && !PhpVariable.IsValidBoundCallback(ctx, map))
+        {
+            PhpException.InvalidArgument(nameof(map));
+            return null;
+        }
 
+        if (arrays.Length == 1 && map == _mapIdentity)
+        {
+            return arrays[0].DeepCopy();
+        }
+
+        map ??= _mapIdentity ??= CreateIdentityCallback();
+
+        var iterators = new OrderedDictionary.FastEnumerator[arrays.Length];
+        int max_count = 0;
         for (int i = 0; i < arrays.Length; i++)
         {
             if (arrays[i] == null)
@@ -311,25 +313,27 @@ public class ArrayMapExample
             iterators[i] = arrays[i].GetFastEnumerator();
             max_count = Math.Max(max_count, arrays[i].Count);
         }
-        
-        var result = new PhpArray(max_count);
-        bool preserve_keys = arrays.Length == 1;
-        const int SmallArrayThreshold = 8; 
 
-        if (arrays.Length <= SmallArrayThreshold)
+        // 4. Выбор стратегии обработки
+        PhpArray result = new PhpArray(max_count);
+        bool preserve_keys = (arrays.Length == 1);
+
+        // Маленькие массивы: создаём новый массив вместо пула
+        PhpValue[] args = arrays.Length <= 4
+            ? new PhpValue[arrays.Length]
+            : ArrayPool<PhpValue>.Shared.Rent(arrays.Length);
+
+        try
         {
-            var args = new PhpValue[arrays.Length];
-
-            for (int n = 0; n < max_count; n++)
+            while (true)
             {
-                bool hasValues = false;
-                
+                bool has_values = false;
                 for (int i = 0; i < arrays.Length; i++)
                 {
                     if (iterators[i].MoveNext())
                     {
                         args[i] = iterators[i].CurrentValue;
-                        hasValues = true;
+                        has_values = true;
                     }
                     else
                     {
@@ -337,62 +341,41 @@ public class ArrayMapExample
                     }
                 }
 
-                if (!hasValues) break;
-                
+                if (!has_values) break;
+
+                var return_value = map.Invoke(ctx, args);
                 if (preserve_keys)
-                {
-                    result.Add(iterators[0].CurrentKey, map.Invoke(ctx, args));
-                }
+                    result.Add(iterators[0].CurrentKey, return_value);
                 else
-                {
-                    result.Add(map.Invoke(ctx, args));
-                }
+                    result.Add(return_value);
             }
         }
-        else
+        finally
         {
-            // 6.2 Оптимизация для больших массивов (используем ArrayPool)
-            var args = ArrayPool<PhpValue>.Shared.Rent(arrays.Length);
-
-            try
-            {
-                for (int n = 0; n < max_count; n++)
-                {
-                    bool hasValues = false;
-
-                    // Заполняем аргументы
-                    for (int i = 0; i < arrays.Length; i++)
-                    {
-                        if (iterators[i].MoveNext())
-                        {
-                            args[i] = iterators[i].CurrentValue;
-                            hasValues = true;
-                        }
-                        else
-                        {
-                            args[i] = PhpValue.Null;
-                        }
-                    }
-
-                    if (!hasValues) break;
-
-                    // Добавляем результат
-                    if (preserve_keys)
-                    {
-                        result.Add(iterators[0].CurrentKey, map.Invoke(ctx, args));
-                    }
-                    else
-                    {
-                        result.Add(map.Invoke(ctx, args));
-                    }
-                }
-            }
-            finally
-            {
+            if (arrays.Length > 4)
                 ArrayPool<PhpValue>.Shared.Return(args);
-            }
         }
 
         return result;
+    }
+
+
+    private static IPhpCallable CreateIdentityCallback()
+    {
+        return PhpCallback.Create((ctx, args) =>
+        {
+            if (args.Length == 1)
+            {
+                return args[0].DeepCopy();
+            }
+
+            var result = new PhpArray(args.Length);
+            foreach (var arg in args)
+            {
+                result.Add(arg.DeepCopy());
+            }
+
+            return result;
+        });
     }
 }
