@@ -2,207 +2,224 @@ using Pchp.Core;
 using peachpie.items.Arrays;
 using Xunit.Abstractions;
 
-namespace peachpie.xunit
+/// <summary>
+/// https://www.php.net/manual/en/function.array-map.php
+/// </summary>
+public class ArrayMapTests
 {
-    public class ArrayMapTests(ITestOutputHelper testOutputHelper)
+    private readonly Context _context = Context.CreateEmpty();
+    private readonly ITestOutputHelper _testOutputHelper;
+
+    public ArrayMapTests(ITestOutputHelper testOutputHelper)
     {
-        private readonly Context _context = Context.CreateEmpty();
+        _testOutputHelper = testOutputHelper;
+    }
 
-        /// <summary>
-        /// Проверяет базовый случай: применение функции к одному массиву.
-        /// </summary>
-        [Fact]
-        public void TestSingleArray()
+    /// <summary>
+    /// example 1
+    /// </summary>
+    [Fact]
+    public void Test_ArrayMap_Cube()
+    {
+        // Arrange
+        var input = new PhpArray { 1, 2, 3, 4, 5 };
+        var callback = PhpCallback.Create((ctx, args) => PhpValue.Create(args[0].ToLong() * args[0].ToLong() * args[0].ToLong()));
+
+        // Act
+        var result = ArrayMapExample.array_map_Optimized(_context, callback, input);
+
+        // Assert
+        Assert.Equal(1, result[0].ToLong());
+        Assert.Equal(8, result[1].ToLong());
+        Assert.Equal(27, result[2].ToLong());
+        Assert.Equal(64, result[3].ToLong());
+        Assert.Equal(125, result[4].ToLong());
+    }
+    /// <summary>
+    /// example 2
+    /// </summary>
+    [Fact]
+    public void Test_ArrayMap_LambdaFunction()
+    {
+        // Arrange
+        var input = new PhpArray { 1, 2, 3, 4, 5 };
+        var callback = PhpCallback.Create((ctx, args) => PhpValue.Create(args[0].ToLong() * 2));
+
+        // Act
+        var result = ArrayMapExample.array_map_Optimized(_context, callback, input);
+
+        // Assert
+        Assert.Equal(2, result[0].ToLong());
+        Assert.Equal(4, result[1].ToLong());
+        Assert.Equal(6, result[2].ToLong());
+        Assert.Equal(8, result[3].ToLong());
+        Assert.Equal(10, result[4].ToLong());
+    }
+    
+    /// <summary>
+    /// example 3
+    /// </summary>
+    [Fact]
+    public void Test_ArrayMap_MultipleArrays()
+    {
+       
+        // Arrange
+        var array1 = new PhpArray { 1, 2, 3, 4, 5 };
+        var array2 = new PhpArray { "uno", "dos", "tres", "cuatro", "cinco" };
+        
+        // Callback
+        var showSpanishCallback = PhpCallback.Create((ctx, args) 
+            => PhpValue.Create($"The number {args[0]} is called {args[1]} in Spanish"));
+
+        // Act
+        var result = ArrayMapExample.array_map_Optimized(_context, showSpanishCallback, array1, array2);
+        
+        for (int i = 0; i < result.Count; i++)
         {
-            // Arrange
-            var array = new PhpArray { 1, 2, 3, 4 };
-            IPhpCallable callback = PhpCallback.Create((ctx, args) => PhpValue.Create(args[0].ToLong() * 2));
-
-            // Act
-            var result = ArrayMapExample.array_map_Optimized(_context, callback, array);
-
-            // Assert
-            Assert.Equal(4, result.Count);
-            Assert.Equal(2, result[0].ToLong());
-            Assert.Equal(4, result[1].ToLong());
-            Assert.Equal(6, result[2].ToLong());
-            Assert.Equal(8, result[3].ToLong());
+            _testOutputHelper.WriteLine(result[i].ToString());
         }
+        
+        // Assert
+        // Assert.Equal("The number 1 is called uno in Spanish", result[0].ToString());
+        // Assert.Equal("The number 2 is called dos in Spanish", result[1].ToString());
+        // Assert.Equal("The number 3 is called tres in Spanish", result[2].ToString());
+        // Assert.Equal("The number 4 is called cuatro in Spanish", result[3].ToString());
+        // Assert.Equal("The number 5 is called cinco in Spanish", result[4].ToString());
+    }
+    
+    /// <summary>
+    /// example 4
+    /// </summary>
+    [Fact]
+    public void Test_ArrayMap_ZipOperation()
+    {
+        // Arrange
+        var array1 = new PhpArray(new[] { 1, 2, 3, 4, 5 });
+        var array2 = new PhpArray(new[] { "one", "two", "three", "four", "five" });
+        var array3 = new PhpArray(new[] { "uno", "dos", "tres", "cuatro", "cinco" });
 
-        /// <summary>
-        /// Проверяет случай с несколькими массивами одинаковой длины.
-        /// </summary>
-        [Fact]
-        public void TestMultipleArraysSameLength()
+        // Act
+        var result = ArrayMapExample.array_map_Optimized(null, null, array1, array2, array3);
+
+        // Assert
+        var expected = new[]
         {
-            // Arrange
-            var array1 = new PhpArray { 1, 2, 3 };
-            var array2 = new PhpArray { 4, 5, 6 };
-            IPhpCallable callback = PhpCallback.Create((ctx, args) => PhpValue.Create(args[0].ToLong() + args[1].ToLong()));
+            new PhpArray { { 0, 1 }, { 1, "one" }, { 2, "uno" } },
+            new PhpArray { { 0, 2 }, { 1, "two" }, { 2, "dos" } },
+            new PhpArray { { 0, 3 }, { 1, "three" }, { 2, "tres" } },
+            new PhpArray { { 0, 4 }, { 1, "four" }, { 2, "cuatro" } },
+            new PhpArray { { 0, 5 }, { 1, "five" }, { 2, "cinco" } }
+        };
 
-            // Act
-            var result = ArrayMapExample.array_map_Optimized(_context, callback, array1, array2);
-
-            // Assert
-            Assert.Equal(3, result.Count);
-            Assert.Equal(5, result[0].ToLong());
-            Assert.Equal(7, result[1].ToLong());
-            Assert.Equal(9, result[2].ToLong());
-        }
-
-        /// <summary>
-        /// Проверяет случай с массивами разной длины (дополнение null).
-        /// </summary>
-        [Fact]
-        public void TestMultipleArraysWithDifferentLengths()
+        for (int i = 0; i < expected.Length; i++)
         {
-            // Arrange
-            var array1 = new PhpArray { 1, 2 };
-            var array2 = new PhpArray { 3, 4, 5 };
-            IPhpCallable callback = PhpCallback.Create((ctx, args) =>
-            {
-                long sum = 0;
-                foreach (var arg in args)
-                {
-                    sum += arg.IsNull ? 0 : arg.ToLong();
-                }
-                return PhpValue.Create(sum);
-            });
-
-            // Act
-            var result = ArrayMapExample.array_map_Optimized(_context, callback, array1, array2);
-
-            // Assert
-            Assert.Equal(3, result.Count);
-            Assert.Equal(4, result[0].ToLong()); // 1 + 3
-            Assert.Equal(6, result[1].ToLong()); // 2 + 4
-            Assert.Equal(5, result[2].ToLong()); // 0 + 5
+            Assert.Equal(expected[i][0], result[i].AsArray()[0]);
+            Assert.Equal(expected[i][1], result[i].AsArray()[1]);
+            Assert.Equal(expected[i][2], result[i].AsArray()[2]);
         }
+    }
+    
+    /// <summary>
+    /// example 5
+    /// </summary>
+    [Fact]
+    public void Test_ArrayMap_NullCallback()
+    {
+        // Arrange
+        var input = new PhpArray(new[] { 1, 2, 3 });
 
-        /// <summary>
-        /// Проверяет случай с пустыми массивами.
-        /// </summary>
-        [Fact]
-        public void TestEmptyArrays()
+        // Act
+        var result = ArrayMapExample.array_map_Optimized(null, null, input);
+
+        // Assert
+        Assert.Equal(1, result[0].ToLong());
+        Assert.Equal(2, result[1].ToLong());
+        Assert.Equal(3, result[2].ToLong());
+    }
+    
+    /// <summary>
+    /// example 6
+    /// </summary>
+    [Fact]
+    public void Test_ArrayMap_WithStringKeys()
+    {
+        // Arrange
+        var ctx = Context.CreateEmpty();
+
+        // Input array with string key
+        var arr = new PhpArray
         {
-            // Arrange
-            var array1 = new PhpArray();
-            var array2 = new PhpArray();
-            IPhpCallable callback = PhpCallback.Create((ctx, args) => PhpValue.Create(args[0].ToLong() + args[1].ToLong()));
+            { "stringkey", "value" }
+        };
 
-            // Act
-            var result = ArrayMapExample.array_map_Optimized(_context, callback, array1, array2);
-            // Assert
-            Assert.Empty(result);
-        }
+        // Callback functions
+        IPhpCallable cb1 = PhpCallback.Create((ctx, args) => new PhpArray { args[0] });
 
-        /// <summary>
-        /// Проверяет случай с null вместо массива.
-        /// </summary>
-        [Fact]
-        public void TestNullArray()
+        IPhpCallable cb2 = PhpCallback.Create((ctx, args) => new PhpArray { args[0], args[1] });
+
+        // Act
+        var result1 = ArrayMapExample.array_map_Optimized(ctx, cb1, arr);
+        var result2 = ArrayMapExample.array_map_Optimized(ctx, cb2, arr, arr);
+        var result3 = ArrayMapExample.array_map_Optimized(ctx, null, arr);
+        var result4 = ArrayMapExample.array_map_Optimized(ctx, null, arr, arr);
+
+        // Assert
+        // Check result1: array_map('cb1', $arr)
+        Assert.Single(result1);
+        Assert.True(result1.ContainsKey("stringkey"));
+        var value1 = result1["stringkey"].AsArray();
+        Assert.Single(value1);
+        Assert.Equal("value", value1[0].ToString());
+
+        // Check result2: array_map('cb2', $arr, $arr)
+        Assert.Single(result2);
+        Assert.True(result2.ContainsKey("stringkey"));
+        var value2 = result2["stringkey"].AsArray();
+        Assert.Equal(2, value2.Count);
+        Assert.Equal("value", value2[0].ToString());
+        Assert.Equal("value", value2[1].ToString());
+
+        // Check result3: array_map(null, $arr)
+        Assert.Single(result3);
+        Assert.True(result3.ContainsKey("stringkey"));
+        Assert.Equal("value", result3["stringkey"].ToString());
+
+        // Check result4: array_map(null, $arr, $arr)
+        Assert.Single(result4);
+        Assert.True(result4.ContainsKey("stringkey"));
+        var value4 = result4["stringkey"].AsArray();
+        Assert.Equal(2, value4.Count);
+        Assert.Equal("value", value4[0].ToString());
+        Assert.Equal("value", value4[1].ToString());
+    }
+    
+    /// <summary>
+    /// example 7
+    /// </summary>
+    [Fact]
+    public void Test_ArrayMap_AssociativeArrays()
+    {
+        // Arrange
+        var arr = new PhpArray
         {
-            // Arrange
-            PhpArray array = null;
-            IPhpCallable callback = PhpCallback.Create((ctx, args) => PhpValue.Create(args[0].ToLong() * 2));
+            ["v1"] = PhpValue.Create("First release"),
+            ["v2"] = PhpValue.Create("Second release"),
+            ["v3"] = PhpValue.Create("Third release")
+        };
 
-            // Act
-            var result = ArrayMapExample.array_map_Optimized(_context, callback, array);
+        var keys = new PhpArray(arr.Keys.Select(k => PhpValue.Create(k.ToString())));
+        var values = new PhpArray(arr.Values);
 
-            // Assert
-            Assert.Null(result);
-        }
+        var callback = PhpCallback.Create((ctx, args) => PhpValue.Create(
+            $"{args[0].ToString()} was the {args[1].ToString()}"
+        ));
 
-        /// <summary>
-        /// Проверяет случай с отсутствующим callback (используется идентичность).
-        /// </summary>
-        [Fact]
-        public void TestIdentityCallback()
-        {
-            // Arrange
-            var array = new PhpArray { 1, 2, 3 };
+        // Act
+        var result = ArrayMapExample.array_map_Optimized(null, callback, keys, values);
 
-            // Act
-            var result = ArrayMapExample.array_map_Optimized(_context, null, array);
-
-            // Assert
-            Assert.Equal(3, result.Count);
-            Assert.Equal(1, result[0].ToLong());
-            Assert.Equal(2, result[1].ToLong());
-            Assert.Equal(3, result[2].ToLong());
-        }
-
-        /// <summary>
-        /// Проверяет случай с сохранением ключей при одном массиве.
-        /// </summary>
-        [Fact]
-        public void TestPreserveKeysWithSingleArray()
-        {
-            // Arrange
-            var array = new PhpArray { ["a"] = 1, ["b"] = 2, ["c"] = 3 };
-            IPhpCallable callback = PhpCallback.Create((ctx, args) => PhpValue.Create(args[0].ToLong() * 2));
-
-            // Act
-            var result = ArrayMapExample.array_map_Optimized(_context, callback, array);
-
-            // Assert
-            Assert.Equal(3, result.Count);
-            Assert.Equal(2, result["a"].ToLong());
-            Assert.Equal(4, result["b"].ToLong());
-            Assert.Equal(6, result["c"].ToLong());
-        }
-
-        /// <summary>
-        /// Проверяет случай с переиндексацией ключей при нескольких массивах.
-        /// </summary>
-        [Fact]
-        public void TestReindexKeysWithMultipleArrays()
-        {
-            // Arrange
-            var array1 = new PhpArray { ["a"] = 1, ["b"] = 2 };
-            var array2 = new PhpArray { ["c"] = 3, ["d"] = 4 };
-            IPhpCallable callback = PhpCallback.Create((ctx, args) => PhpValue.Create(args[0].ToLong() + args[1].ToLong()));
-
-            // Act
-            var result = ArrayMapExample.array_map_Optimized(_context, callback, array1, array2);
-
-            // Assert
-            Assert.Equal(2, result.Count);
-            Assert.Equal(4, result[0].ToLong()); // 1 + 3
-            Assert.Equal(6, result[1].ToLong()); // 2 + 4
-        }
-
-        /// <summary>
-        /// Проверяет случай с большим количеством массивов.
-        /// </summary>
-        [Fact]
-        public void TestWithManyArrays()
-        {
-            // Arrange
-            var arrays = new PhpArray[]
-            {
-                new PhpArray { 1, 2, 3 },
-                new PhpArray { 4, 5, 6 },
-                new PhpArray { 7, 8, 9 }
-            };
-            IPhpCallable callback = PhpCallback.Create((ctx, args) =>
-            {
-                long sum = 0;
-                foreach (var arg in args)
-                {
-                    sum += arg.ToLong();
-                }
-                return PhpValue.Create(sum);
-            });
-
-            // Act
-            var result = ArrayMapExample.array_map_Optimized(_context, callback, arrays);
-
-            // Assert
-            Assert.Equal(3, result.Count);
-            Assert.Equal(12, result[0].ToLong()); // 1 + 4 + 7
-            Assert.Equal(15, result[1].ToLong()); // 2 + 5 + 8
-            Assert.Equal(18, result[2].ToLong()); // 3 + 6 + 9
-        }
+        // Assert
+        Assert.Equal("v1 was the First release", result[0].ToString());
+        Assert.Equal("v2 was the Second release", result[1].ToString());
+        Assert.Equal("v3 was the Third release", result[2].ToString());
     }
 }

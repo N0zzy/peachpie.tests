@@ -6,7 +6,7 @@
 &lt;/SessionState&gt;</s:String>
 	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=b00a32c0_002D5df4_002D4e6a_002Db42c_002Dc16dca71d113/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="ArrayMapTests" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
   &lt;TestAncestor&gt;&#xD;
-    &lt;TestId&gt;xUnit::035B31AA-8143-4C42-B511-EAD59BB6A30A::net8.0::peachpie.xunit.ArrayMapTests&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::035B31AA-8143-4C42-B511-EAD59BB6A30A::net8.0::ArrayMapTests&lt;/TestId&gt;&#xD;
   &lt;/TestAncestor&gt;&#xD;
 &lt;/SessionState&gt;</s:String>
 	

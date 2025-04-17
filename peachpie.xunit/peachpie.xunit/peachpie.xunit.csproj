@@ -27,4 +27,8 @@
       <ProjectReference Include="..\..\peachpie.items\peachpie.items\peachpie.items.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Remove="NewFile1.txt" />
+    </ItemGroup>
+
 </Project>
